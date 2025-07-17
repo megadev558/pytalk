@@ -3,7 +3,7 @@ services:
     name: pytalksupreme
     env: python
     buildCommand: ""
-    startCommand: python client.py
+    startCommand: gunicorn client:app
     envVars:
       - key: FLASK_ENV
         value: production
