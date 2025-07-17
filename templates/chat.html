@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>PyTalk Supreme</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #eef; margin: 0; padding: 1rem; }
+    h1 { text-align: center; margin-bottom: 1rem; }
+    .videos { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+    video { width: 100%; max-width: 300px; border-radius: 8px; box-shadow: 0 0 10px #888; }
+    .chat-container { max-width: 500px; margin: 2rem auto; background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 0 10px #bbb; }
+    input, button { width: 100%; padding: 10px; margin-top: 10px; font-size: 1rem; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
+    button { background: #0077cc; color: white; border: none; cursor: pointer; }
+    button:hover { background: #005fa3; }
+    .messages p { margin: 0.5rem 0; background: #f7f7f7; padding: 8px; border-radius: 6px; }
+    #userList { list-style: none; padding: 0; text-align: center; margin-bottom: 1rem; }
+    #userList li { margin: 5px 0; font-weight: bold; }
+    @media(max-width:600px){ video{ max-width:100%; } }
+  </style>
+</head>
+<body>
+  <h1>🔥 PyTalk Supreme Visio & Chat</h1>
+
+  <ul id="userList">👥 Utilisateurs connectés : ...</ul>
+
+  <div class="videos">
+    <video id="localVideo" autoplay muted playsinline></video>
+    <video id="remoteVideo" autoplay playsinline></video>
+  </div>
+
+  <div class="chat-container">
+    <form id="chatForm">
+      <input id="pseudo" placeholder="Ton pseudo (affiché)" required>
+      <input id="text" placeholder="Ton message" required>
+      <button type="submit">Envoyer</button>
+    </form>
+    <div class="messages" id="chatArea"></div>
+  </div>
+
+
+
+  <script>
+    const socket = io();
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+    const userList = document.getElementById("userList");
+    const peer = new RTCPeerConnection();
+    let myId = "";
+
+    // Cam + micro
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(stream => {
+        localVideo.srcObject = stream;
+        stream.getTracks().forEach(track => peer.addTrack(track, stream));
+      });
+
+    peer.ontrack = e => {
+      remoteVideo.srcObject = e.streams[0];
+      document.getElementById("receiveSound").play();
+    };
+
+    peer.onicecandidate = e => {
+      if (e.candidate) socket.emit("signal", { type: "ice", candidate: e.candidate });
+    };
+
+    socket.on("your_id", data => { myId = data.id });
+
+    socket.on("user_list", users => {
+      userList.innerHTML = "";
+      users.forEach(u => {
+        if (u !== myId) {
+          const li = document.createElement("li");
+          li.textContent = "📡 Utilisateur connecté";
+          userList.appendChild(li);
+        }
+      });
+    });
+
+    socket.on("signal", async data => {
+      if (data.type === "offer" && data.sender !== myId) {
+        await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        socket.emit("signal", { type: "answer", answer, sender: myId });
+      }
+      if (data.type === "answer" && data.sender !== myId) {
+        await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
+      if (data.type === "ice") {
+        try { await peer.addIceCandidate(data.candidate); } catch (e) { console.error(e); }
+      }
+    });
+
+    peer.onnegotiationneeded = async () => {
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      socket.emit("signal", { type: "offer", offer, sender: myId });
+      document.getElementById("sendSound").play();
+    };
+
+    // Chat texte
+    const form = document.getElementById("chatForm");
+    const chatArea = document.getElementById("chatArea");
+
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      const pseudo = document.getElementById("pseudo").value;
+      const text = document.getElementById("text").value;
+      const time = new Date().toLocaleTimeString();
+      const msg = { pseudo, text, time };
+      socket.emit("message", msg);
+      form.reset();
+    });
+
+    socket.on("message", msg => {
+      const p = document.createElement("p");
+      p.innerHTML = `<strong>${msg.pseudo}</strong> • ${msg.time}<br>${msg.text}`;
+      chatArea.appendChild(p);
+      document.getElementById("receiveSound").play();
+    });
+  </script>
+</body>
+</html>
