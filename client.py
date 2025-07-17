@@ -45,9 +45,6 @@ def login():
         email = request.form.get("email")
         password = request.form.get("password")
 
-        if not email or not password:
-            return render_template("login.html", error="Champs incomplets")
-
         users = load_users()["users"]
         for user in users:
             if user["email"] == email and user["password"] == password:
