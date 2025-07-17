@@ -2,7 +2,8 @@ from flask import Flask, render_template, request, redirect, session, url_for
 from flask_socketio import SocketIO, emit
 from werkzeug.security import generate_password_hash, check_password_hash
 import json, uuid
-
+import os
+app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), "chemin/vers/templates"))
 app = Flask(__name__)
 app.secret_key = "pysecret"
 socketio = SocketIO(app, manage_session=False)
