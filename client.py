@@ -42,15 +42,21 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form["email"]
-        password = request.form["password"]
-        for u in load_users():
-            if u["email"] == email and check_password_hash(u["password"], password):
-                session["user"] = u["pseudo"]
-                return redirect("/chat")
-        return render_template("login.html", error="Email ou mot de passe incorrect")
-    return render_template("login.html", error=None)
+        email = request.form.get("email")
+        password = request.form.get("password")
 
+        if not email or not password:
+            return render_template("login.html", error="Champs incomplets")
+
+        users = load_users()["users"]
+        for user in users:
+            if user["email"] == email and user["password"] == password:
+                session["username"] = user["username"]
+                return redirect("/dashboard")
+
+        return render_template("login.html", error="Email ou mot de passe incorrect")
+    
+    return render_template("login.html")
 @app.route("/chat")
 def chat():
     if "user" not in session:
