@@ -3,7 +3,7 @@ from flask_socketio import SocketIO, emit
 from werkzeug.security import generate_password_hash, check_password_hash
 import json, uuid
 import os
-app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), "chemin/vers/templates"))
+
 app = Flask(__name__)
 app.secret_key = "pysecret"
 socketio = SocketIO(app, manage_session=False)
@@ -14,15 +14,18 @@ connected_users = {}
 
 # Gestion utilisateurs
 def load_users():
-    try: return json.load(open(USER_FILE))
-    except: return []
+    try:
+        return json.load(open(USER_FILE))
+    except:
+        return []
 
 def save_users(data):
     json.dump(data, open(USER_FILE, "w"))
 
+# Nouvelle route d'accueil
 @app.route("/")
 def home():
-    return redirect("/login")
+    return render_template("home.html")
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -45,15 +48,16 @@ def login():
         email = request.form.get("email")
         password = request.form.get("password")
 
-        users = load_users()["users"]
+        users = load_users()
         for user in users:
-            if user["email"] == email and user["password"] == password:
-                session["username"] = user["username"]
-                return redirect("/dashboard")
+            if user["email"] == email and check_password_hash(user["password"], password):
+                session["user"] = user["pseudo"]
+                return redirect("/chat")
 
         return render_template("login.html", error="Email ou mot de passe incorrect")
     
     return render_template("login.html")
+
 @app.route("/chat")
 def chat():
     if "user" not in session:
@@ -69,7 +73,6 @@ def connect():
 
 @socketio.on("disconnect")
 def disconnect():
-    # suppression simplifiée
     emit("user_list", list(connected_users.values()), broadcast=True)
 
 @socketio.on("signal")
